@@ -1,0 +1,34 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Secrets & local credentials — never commit these
+.env
+.env.*
+!.env.example
+data/tokens.json
+data/*.db
+data/*.sqlite3
+config/google_service_account.json
+config/faraz-honar-*.json
+*.key
+*.pem
+
+ # Logs
+logs/*
+!logs/.gitkeep
+ deploy/*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Test / build artifacts
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/

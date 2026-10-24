@@ -1,0 +1,19 @@
+# Runtime dependencies
+requests>=2.31
+pydantic>=2.6
+pydantic-settings>=2.2
+gspread>=6.0
+google-auth>=2.28
+python-telegram-bot>=21.0
+APScheduler>=3.10
+PyYAML>=6.0
+jdatetime>=5.0
+openpyxl>=3.1
+
+# Dev / test dependencies
+pytest>=8.0
+pytest-mock>=3.12
+ruff>=0.4
+mypy>=1.9
+types-PyYAML
+types-requests

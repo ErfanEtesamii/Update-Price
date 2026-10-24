@@ -1,0 +1,51 @@
+# Maps logical field names used throughout the app to the ACTUAL column
+# header text in the product Google Sheet. Matching is whitespace/case
+# insensitive.
+#
+# Source: LIVE Google Sheets API read on 2026-09-19, spreadsheet
+# 1A5hVB4PN4TDurhwb4cPjtcuDgvK7XalwmekDfSne3Ss, worksheet "محصولات سایت
+# جدید" (gid=391280922) — the tab actually used in production (see
+# GOOGLE_SHEET_WORKSHEET_NAME in .env). An earlier CSV export mistakenly
+# used for this file's first draft was from a DIFFERENT tab
+# ("محصولات سایت قدیمی", gid=0) — do not use that tab's structure.
+
+# --- CONFIRMED against the live sheet ---------------------------------------
+name_column: "اسم"                 # original/internal product name -> Product.internal_id
+display_name_column: "اسم جدید"    # cleaned display name -> Product.name
+reference_price_column: "قیمت"     # kept as a fallback for platforms without a live-price
+                                    # API read; DigiKala ignores this and uses its own live
+                                    # price_list instead (see DigikalaClient.get_reference_price)
+
+# CONFIRMED by user on 2026-09-19: "قیمت اصلی" is the target price.
+# Note: only ~28% of rows had this populated as of the 2026-09-19 read —
+# products without a value here will correctly report FAILED_INVALID_DATA
+# ("no target price found") rather than being silently skipped or guessed.
+target_price_column: "قیمت اصلی"
+
+# --- Per-platform product identifiers found in the sheet -------------------
+# Two independent DigiKala seller accounts, each with its own sheet column
+# and its own credentials/tokens (see platforms/registry.py):
+#   - "digikala"  (main account, shown in Telegram as "Digikala")
+#       <- "دیجی کالا اصلی"
+#   - "digikala2" (fast account, shown in Telegram as "Digikala Saree")
+#       <- "دیجی کالا سریع"
+# (Renamed 2026-09: "digikala_asli" -> "digikala" and the old "digikala"
+# -> "digikala2"; the sheet column headers themselves did not change.)
+# Each account is only ever matched against its own column — "دیجی کالا
+# اصلی" is never used for the "digikala2" key, and "دیجی کالا سریع" is
+# never used for "digikala".
+platform_ref_columns:
+  digikala: "دیجی کالا اصلی"
+  digikala2: "دیجی کالا سریع"
+  woocommerce: "وردپرس"            # Faraz Honar WooCommerce store; column header unchanged, only
+                                    # the internal mapping key was renamed from 'wordpress'
+  tapsi_shop: "تپسی شاپ"           # new platform column found in this tab; no client implemented yet
+  basalam: "باسلام"
+  pindo: "پیندو"
+  snappshop_tehran: "اسنپ شاپ تهران"
+  snappshop_isfahan: "اسنپ شاپ اصفهان"
+
+# Free-text operator note column. Preserved (and so is "وضعیت دیجی کالا",
+# automatically, via Product.raw) but nothing here filters or skips products
+# automatically — no such rule has been specified.
+note_column: "شرح"
