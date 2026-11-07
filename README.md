@@ -2,7 +2,7 @@
 
 Reads product prices from a Google Sheet and updates them on seller
 platforms (DigiKala first) through their APIs, respecting a maximum 12%
-price-increase-per-update rule, with Telegram as the control/reporting
+price-increase-per-update rule, with Bale as the control/reporting
 interface. Python only — no web UI.
 
 ## Status
@@ -66,7 +66,7 @@ Run tests / lint / types:
 .venv/bin/python -m mypy src
 ```
 
-Run the app (requires `TELEGRAM_BOT_TOKEN` at minimum; will otherwise exit
+Run the app (requires `BALE_BOT_TOKEN` at minimum; will otherwise exit
 with a clear error naming what's missing):
 
 ```bash
@@ -85,7 +85,7 @@ See `.env.example` for the full list with comments. Summary:
 | `DIGIKALA_ACCESS_TOKEN`, `DIGIKALA_REFRESH_TOKEN` | bootstrap tokens (first run only; refreshed tokens persist to `DATA_DIR/tokens.json`) |
 | `DIGIKALA_ENABLE_TOKEN_REFRESH` | must be `true` for the refresh call to ever fire |
 | `WOOCOMMERCE_CONSUMER_KEY`, `WOOCOMMERCE_CONSUMER_SECRET` | Faraz Honar WooCommerce store (farazhonar.com) REST API credentials |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USER_IDS` | bot control interface + allowlist |
+| `BALE_BOT_TOKEN`, `BALE_ALLOWED_USER_IDS` | bot control interface + allowlist |
 | `TELEGRAM_CHAT_ID_1`..`TELEGRAM_CHAT_ID_10`, `TELEGRAM_CHAT_NAME_1`..`TELEGRAM_CHAT_NAME_10` | optional numbered per-person chats (see below) |
 | `MAX_PRICE_INCREASE_PCT`, `MAX_RETRY_ATTEMPTS`, `HOURLY_RECHECK_MINUTES` | business-rule knobs, default to spec values (0.12, 3, 60) |
 
@@ -96,7 +96,7 @@ keeps the bot's authorization and messages exactly as before this feature.
 When set, each `TELEGRAM_CHAT_ID_N` (N = 1..10) is:
 
 - **Authorized** to use the bot, on top of anyone already listed in
-  `TELEGRAM_ALLOWED_USER_IDS` (the two lists are unioned; the allowlist is
+  `BALE_ALLOWED_USER_IDS` (the two lists are unioned; the allowlist is
   still fail-closed if both are empty).
 - **Notified** with a short "who did what" heads-up — e.g. `🔔 آقای اعتصامی
   به‌روزرسانی قیمت‌های دیجی‌کالا را شروع کرد.` — whenever *any* configured

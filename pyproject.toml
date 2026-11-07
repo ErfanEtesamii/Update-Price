@@ -1,7 +1,7 @@
 [project]
 name = "faraz-honar"
 version = "0.1.0"
-description = "Multi-platform product price updater (Google Sheet source, DigiKala first) controlled via Telegram."
+description = "Multi-platform product price updater (Google Sheet source, DigiKala first) controlled via Bale."
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",

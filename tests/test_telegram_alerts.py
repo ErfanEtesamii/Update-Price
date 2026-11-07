@@ -1,8 +1,4 @@
-"""Tests for telegram_bot/alerts.py (error handler + admin alerts).
-
-Uses asyncio.run() directly (no pytest-asyncio dependency), matching
-test_telegram_sending.py.
-"""
+"""Tests for the shared error handler and Bale admin alerts."""
 from __future__ import annotations
 
 import asyncio
@@ -50,20 +46,20 @@ def test_network_error_classification():
 
 
 def test_monitor_one_alert_per_cooldown_window():
-    m = alerts.ConnectionMonitor(_settings(telegram_alert_cooldown_minutes=30))
-    send, count, _ = m.record_network_error(now=1000.0)
+    monitor = alerts.ConnectionMonitor(_settings(telegram_alert_cooldown_minutes=30))
+    send, count, _ = monitor.record_network_error(now=1000.0)
     assert send and count == 1
-    for t in (1100.0, 1200.0, 2000.0):
-        send, _, _ = m.record_network_error(now=t)
-        assert not send  # storm inside the cooldown -> silent
-    send, count, _ = m.record_network_error(now=1000.0 + 1800.0)
-    assert send and count == 4  # 3 suppressed + this one
+    for now in (1100.0, 1200.0, 2000.0):
+        send, _, _ = monitor.record_network_error(now=now)
+        assert not send
+    send, count, _ = monitor.record_network_error(now=2800.0)
+    assert send and count == 4
 
 
 def test_monitor_disabled_never_alerts():
-    m = alerts.ConnectionMonitor(_settings(telegram_alerts_enabled=False))
-    assert m.record_network_error(now=1.0)[0] is False
-    assert m.record_other_error(now=1.0) is False
+    monitor = alerts.ConnectionMonitor(_settings(telegram_alerts_enabled=False))
+    assert monitor.record_network_error(now=1.0)[0] is False
+    assert monitor.record_other_error(now=1.0) is False
 
 
 def test_on_error_network_sends_one_admin_alert_without_secrets(monkeypatch):
@@ -74,16 +70,15 @@ def test_on_error_network_sends_one_admin_alert_without_secrets(monkeypatch):
 
     async def scenario():
         app, created = _app(_settings())
-        secret = "https://api.telegram.org/bot123456:SECRET/getMe"
+        secret = "https://tapi.bale.ai/bot123456:SECRET/getMe"
         ctx = SimpleNamespace(error=NetworkError(secret), application=app)
         await alerts.on_error(None, ctx)
-        await alerts.on_error(None, ctx)  # second one is inside the cooldown
+        await alerts.on_error(None, ctx)
         assert len(created) == 1
         await asyncio.gather(*created)
 
     monkeypatch.setattr(alerts, "send_message_with_retry", fake_send)
     asyncio.run(scenario())
-
     assert len(sent) == 1
     assert sent[0]["chat_id"] == 775
     assert "NetworkError" in sent[0]["text"]
@@ -104,7 +99,6 @@ def test_on_error_bug_alerts_class_name_only(monkeypatch):
 
     monkeypatch.setattr(alerts, "send_message_with_retry", fake_send)
     asyncio.run(scenario())
-
     assert len(sent) == 1
     assert "ValueError" in sent[0]["text"]
     assert "SECRET" not in sent[0]["text"]
@@ -113,7 +107,7 @@ def test_on_error_bug_alerts_class_name_only(monkeypatch):
 def test_alert_delivery_failure_never_raises(monkeypatch):
     monkeypatch.setattr(alerts, "send_message_with_retry", AsyncMock(side_effect=RuntimeError("x")))
     app, _ = _app(_settings())
-    asyncio.run(alerts._send_admin(app, "hi"))  # must not raise
+    asyncio.run(alerts._send_admin(app, "hi"))
 
 
 def test_no_recipient_means_no_send(monkeypatch):

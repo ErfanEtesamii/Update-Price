@@ -32,10 +32,10 @@ def _settings(**overrides: Any) -> Settings:
     return Settings(**base)
 
 
-def test_service_build_fails_clearly_without_google_credentials():
-    settings = _settings()
-    with pytest.raises(ConfigurationError, match="GOOGLE_SERVICE_ACCOUNT_FILE"):
-        build_service(settings)
+def test_service_build_fails_clearly_without_an_uploaded_excel_file(tmp_path):
+    settings = _settings(data_dir=tmp_path)
+    with pytest.raises(ConfigurationError, match="Excel product source file not found"):
+        build_service(settings)._product_source.fetch_products()  # noqa: SLF001
 
 
 def test_service_builds_successfully_with_csv_fallback():
@@ -60,7 +60,7 @@ def test_service_builds_successfully_with_csv_fallback():
 def test_bot_build_fails_clearly_without_token():
     settings = _settings(product_source_csv_path=FIXTURES / "sample_product_sheet.csv")
     service = build_service(settings)
-    with pytest.raises(ConfigurationError, match="TELEGRAM_BOT_TOKEN"):
+    with pytest.raises(ConfigurationError, match="BALE_BOT_TOKEN"):
         build_application(settings, service)
 
 
@@ -82,6 +82,17 @@ def test_product_source_selection_prefers_csv_when_configured():
     from faraz_honar.sheets.csv_source import CSVProductSource
 
     assert isinstance(source, CSVProductSource)
+
+
+def test_product_source_selection_defaults_to_excel(tmp_path):
+    """No Google Sheets involvement anymore: with no CSV override, the
+    product source is always the uploaded-Excel one (see
+    telegram_bot/handlers.py::document_message_handler)."""
+    settings = _settings(data_dir=tmp_path)
+    source = build_product_source(settings)
+    from faraz_honar.sheets.excel_source import ExcelProductSource
+
+    assert isinstance(source, ExcelProductSource)
 
 
 def test_service_wires_configured_digikala_delays_into_client():
@@ -109,6 +120,6 @@ def test_bot_applies_raised_timeouts_error_handler_and_proxy():
     )
     application = build_application(settings, build_service(settings))
     assert application.error_handlers, "global error handler must be registered"
-    request = application.bot._request[1]  # noqa: SLF001 - white-box: the normal-API request
+    request = application.bot._request[1]  # noqa: SLF001 - normal API request
     assert request._client.timeout.connect == 30  # noqa: SLF001
-    assert application.bot._request[0]._client.timeout.read == 40  # noqa: SLF001 - getUpdates: 30+10
+    assert application.bot._request[0]._client.timeout.read == 40  # noqa: SLF001

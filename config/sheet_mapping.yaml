@@ -11,7 +11,12 @@
 
 # --- CONFIRMED against the live sheet ---------------------------------------
 name_column: "اسم"                 # original/internal product name -> Product.internal_id
-display_name_column: "اسم جدید"    # cleaned display name -> Product.name
+# CONFIRMED by user on 2026-11-07, for the Excel-source variant of this
+# project (Update Price Bale, reads an uploaded .xlsx -> sheets/excel_source.py,
+# no Google Sheets involved): the uploaded workbook's "محصولات سایت جدید" tab
+# has no "اسم جدید" column; "اسم  حسابداری" ("accounting name", note the
+# double space in the actual header) is used as the display name instead.
+display_name_column: "اسم  حسابداری"  # cleaned display name -> Product.name
 reference_price_column: "قیمت"     # kept as a fallback for platforms without a live-price
                                     # API read; DigiKala ignores this and uses its own live
                                     # price_list instead (see DigikalaClient.get_reference_price)

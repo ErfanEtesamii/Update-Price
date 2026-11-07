@@ -1,4 +1,4 @@
-"""Admin alerts + global error handler for the Telegram bot.
+"""Admin alerts + global error handler for the Bale bot.
 
 Why this exists: python-telegram-bot logs "No error handlers are
 registered" and does nothing else when an update handler or the polling loop
@@ -8,7 +8,7 @@ no explanation. This module:
 * classifies errors (network blip vs. real bug),
 * sends ONE alert per cooldown window to the admin (not one per error),
 * sends it through send_message_with_retry, which retries forever - so the
-  alert arrives as soon as Telegram is reachable again, even if it was the
+  alert arrives as soon as Bale is reachable again, even if it was the
   outage itself that triggered it.
 
 Security: only exception CLASS NAMES are ever logged or sent. str(exc) of a
@@ -32,7 +32,7 @@ _MONITOR_KEY = "connection_monitor"
 
 
 def alert_recipient(settings: Settings) -> int | None:
-    """ADMIN_CHAT_ID, else the lowest allowed user id, else None."""
+    """BALE_ADMIN_CHAT_ID, else the lowest allowed user id, else None."""
     if settings.admin_chat_id:
         return settings.admin_chat_id
     allowed = sorted(settings.telegram_allowed_user_ids_set)
@@ -111,14 +111,14 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     name = type(exc).__name__
 
     if is_network_error(exc):
-        logger.warning("Telegram network error (%s)", name)
+        logger.warning("Bale network error (%s)", name)
         if monitor is None:
             return
         send_now, count, window = monitor.record_network_error()
         if send_now:
             span = f" (طی حدود {max(1, int(window // 60))} دقیقه)" if count > 1 else ""
             text = (
-                "⚠️ هشدار: اختلال در اتصال بات به تلگرام\n"
+                "⚠️ هشدار: اختلال در اتصال بات به بله\n"
                 f"نوع خطا: {name}\n"
                 f"تعداد خطا: {count}{span}\n"
                 f"زمان: {_now_text()}\n"
@@ -145,7 +145,7 @@ async def send_startup_notice(application: Application) -> None:
     """post_init hook: tells the admin the bot (re)started - so a crash loop or
     an unexpected service restart never goes unnoticed."""
     text = (
-        "✅ بات فراز هنر راه‌اندازی شد\n"
+        "✅ بات فراز هنر روی بله راه‌اندازی شد\n"
         f"زمان: {_now_text()}"
     )
     application.create_task(_send_admin(application, text))

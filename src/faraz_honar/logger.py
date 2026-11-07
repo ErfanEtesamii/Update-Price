@@ -54,8 +54,8 @@ def setup_logging(
 
     logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
 
-    # httpx (used by python-telegram-bot) logs every request URL at INFO, and
-    # Telegram URLs contain the bot token: keep it out of the log files.
+    # httpx (used by the Bale transport) logs every request URL at INFO, and
+    # Bale URLs contain the bot token: keep it out of the log files.
     for noisy in ("httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 

@@ -41,20 +41,20 @@ def test_digikala_delay_settings_are_configurable_via_env(monkeypatch):
     assert settings.digikala_write_delay_seconds == 7.0
 
 
-def test_telegram_chat_ids_set_defaults_to_empty(monkeypatch):
-    monkeypatch.delenv("TELEGRAM_CHAT_IDS", raising=False)
+def test_bale_chat_ids_set_defaults_to_empty(monkeypatch):
+    monkeypatch.delenv("BALE_CHAT_IDS", raising=False)
     settings = Settings(_env_file=None)
     assert settings.telegram_chat_ids_set == set()
 
 
-def test_telegram_chat_ids_set_parses_comma_separated_ids(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_CHAT_IDS", "123456789,987654321,555555555")
+def test_bale_chat_ids_set_parses_comma_separated_ids(monkeypatch):
+    monkeypatch.setenv("BALE_CHAT_IDS", "123456789,987654321,555555555")
     settings = Settings(_env_file=None)
     assert settings.telegram_chat_ids_set == {123456789, 987654321, 555555555}
 
 
-def test_telegram_chat_ids_set_tolerates_whitespace_and_blank_entries(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_CHAT_IDS", " 111 , , 222 ,333 ")
+def test_bale_chat_ids_set_tolerates_whitespace_and_blank_entries(monkeypatch):
+    monkeypatch.setenv("BALE_CHAT_IDS", " 111 , , 222 ,333 ")
     settings = Settings(_env_file=None)
     assert settings.telegram_chat_ids_set == {111, 222, 333}
 
@@ -62,8 +62,8 @@ def test_telegram_chat_ids_set_tolerates_whitespace_and_blank_entries(monkeypatc
 def test_telegram_chat_ids_set_is_independent_of_allowed_user_ids(monkeypatch):
     # TELEGRAM_CHAT_IDS (who receives reports) and TELEGRAM_ALLOWED_USER_IDS
     # (who may send commands) are separate settings.
-    monkeypatch.setenv("TELEGRAM_ALLOWED_USER_IDS", "1,2,3")
-    monkeypatch.setenv("TELEGRAM_CHAT_IDS", "999")
+    monkeypatch.setenv("BALE_ALLOWED_USER_IDS", "1,2,3")
+    monkeypatch.setenv("BALE_CHAT_IDS", "999")
     settings = Settings(_env_file=None)
     assert settings.telegram_allowed_user_ids_set == {1, 2, 3}
     assert settings.telegram_chat_ids_set == {999}

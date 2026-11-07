@@ -1,5 +1,6 @@
 """Wires the hourly 12%-recheck job (spec section 8) onto the bot's
-JobQueue. Uses python-telegram-bot's built-in JobQueue (APScheduler-backed)
+application scheduler. Uses python-telegram-bot's built-in JobQueue
+(APScheduler-backed) as a Bale API transport dependency,
 so there's a single event loop instead of a second scheduler thread.
 """
 from __future__ import annotations

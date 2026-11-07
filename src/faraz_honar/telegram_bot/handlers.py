@@ -22,11 +22,14 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from faraz_honar.config import Settings
+from faraz_honar.core.exceptions import ConfigurationError
 from faraz_honar.core.models import Product, RunSummary, UpdateResult
 from faraz_honar.logger import clear_log_file
 from faraz_honar.platform_names import PLATFORM_DISPLAY_NAMES
 from faraz_honar.reporting.status_matrix import build_status_matrix
 from faraz_honar.reporting.xlsx_export import export_status_matrix_xlsx
+from faraz_honar.sheets.excel_source import ExcelProductSource
+from faraz_honar.sheets.mapping import SheetMapping
 from faraz_honar.telegram_bot.auth import build_allowed_ids, is_allowed
 from faraz_honar.telegram_bot.keyboards import (
     BTN_ALL_PLATFORMS,
@@ -37,6 +40,7 @@ from faraz_honar.telegram_bot.keyboards import (
     BTN_CONFIRM_YES,
     BTN_LAST_STATUS,
     BTN_SELECT_PLATFORM,
+    BTN_SEND_EXCEL,
     BTN_STATUS,
     BTN_STOP,
     build_confirm_keyboard,
@@ -108,6 +112,13 @@ _MAIN_MENU_TEXT = "🤖 Faraz Honar"
 # to pick (see _handle_last_status).
 _AWAITING_PLATFORM_FOR_KEY = "awaiting_platform_for"
 _MODE_RUN = "run"
+
+# "📤 ارسال اکسل محصولات": set per-chat while the bot is waiting for the next
+# .xlsx document in that chat (see document_message_handler). Purely a UX
+# nicety for the confirmation reply — the handler accepts an .xlsx document
+# from an authorized user at any time, flag or not, so a file sent without
+# first tapping the button still works.
+_AWAITING_EXCEL_KEY = "awaiting_excel_upload"
 
 # A بله/خیر confirmation currently awaiting the person's reply, stored per-chat
 # in context.user_data so the plain-text "✅ بله"/"❌ خیر" buttons (shared by
@@ -275,6 +286,15 @@ async def menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await _handle_clear_database(update, context)
         return
 
+    if text == BTN_SEND_EXCEL:
+        context.user_data[_AWAITING_EXCEL_KEY] = True
+        await message.reply_text(
+            "📤 فایل اکسل محصولات (.xlsx) را همینجا ارسال کنید.\n"
+            "بعد از دریافت، تمام قیمت‌ها و محصولات از روی همین فایل خوانده می‌شوند "
+            "(به‌جای گوگل شیت) تا وقتی فایل جدیدی ارسال شود.",
+        )
+        return
+
     if text == BTN_ALL_PLATFORMS:
         context.user_data.pop(_AWAITING_PLATFORM_FOR_KEY, None)
         user = update.effective_user
@@ -291,6 +311,76 @@ async def menu_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     # Unrecognized text: never dead-end the user — just show the persistent
     # menu again instead of requiring /start.
     await message.reply_text(_MAIN_MENU_TEXT, reply_markup=build_main_menu_keyboard())
+
+
+# -- Excel product source ("📤 ارسال اکسل محصولات") -----------------------------
+#
+# Replaces the Google Sheet entirely: the .xlsx the person sends here is
+# saved to Settings.excel_product_source_path, overwriting whatever was
+# there before. Every subsequent product_source.fetch_products() call (a
+# run, the hourly recheck, "🔍 چک و بررسی قیمت‌ها", "📊 گزارش") re-reads that
+# same file fresh — see sheets/excel_source.py — so nothing else needs to be
+# restarted or re-built for the new prices to take effect.
+
+_DEFAULT_SHEET_MAPPING_PATH = Path("config/sheet_mapping.yaml")
+
+
+async def document_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.message
+    if message is None or message.document is None:
+        return
+
+    settings = _settings(context)
+    if not _is_authorized(update, settings):
+        await message.reply_text(_UNAUTHORIZED_TEXT)
+        logger.warning("Unauthorized document upload from user_id=%s", update.effective_user)
+        return
+
+    document = message.document
+    file_name = document.file_name or ""
+    if not file_name.lower().endswith(".xlsx"):
+        # Only acted on when the person is in the middle of the "send excel"
+        # flow -- otherwise a random PDF/photo/other file shared in the chat
+        # would wrongly get this reply.
+        if context.user_data.pop(_AWAITING_EXCEL_KEY, False):
+            await message.reply_text(
+                "این یک فایل .xlsx نیست. لطفاً فایل اکسل محصولات را دوباره ارسال کنید.",
+                reply_markup=build_main_menu_keyboard(),
+            )
+        return
+
+    context.user_data.pop(_AWAITING_EXCEL_KEY, None)
+
+    target_path = settings.excel_product_source_path
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    telegram_file = await document.get_file()
+    await telegram_file.download_to_drive(custom_path=str(target_path))
+
+    try:
+        mapping = SheetMapping.load(_DEFAULT_SHEET_MAPPING_PATH)
+        products = await asyncio.to_thread(
+            ExcelProductSource(
+                path=target_path,
+                mapping=mapping,
+                worksheet_name=settings.excel_worksheet_name,
+            ).fetch_products
+        )
+    except ConfigurationError as exc:
+        logger.warning("Uploaded Excel file saved but could not be read: %s", exc)
+        await message.reply_text(
+            "⚠️ فایل ذخیره شد اما قابل خواندن نیست:\n"
+            f"{exc}\n"
+            "تا ارسال یک فایل معتبر، اجراها با همین خطا متوقف می‌مانند.",
+            reply_markup=build_main_menu_keyboard(),
+        )
+        return
+
+    logger.info("Product Excel source updated from chat_id=%s (%d products)", message.chat.id, len(products))
+    await message.reply_text(
+        f"✅ فایل اکسل محصولات دریافت و جایگزین شد ({len(products)} محصول).\n"
+        "از این به بعد تمام اجراها و گزارش‌ها از روی همین فایل خوانده می‌شوند.",
+        reply_markup=build_main_menu_keyboard(),
+    )
 
 
 async def hourly_recheck_job(context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -24,6 +24,11 @@ BTN_STATUS = "📊 وضعیت اجرا"
 BTN_STOP = "⏹ توقف اجرا"
 BTN_BACK = "🔙 بازگشت"
 
+# Arms the bot to accept the NEXT .xlsx document sent in this chat as the new
+# product source (see handlers.py::document_message_handler); the file is
+# used in place of a Google Sheet for every subsequent run/check.
+BTN_SEND_EXCEL = "📤 ارسال اکسل محصولات"
+
 # Last platform button in the "📦 انتخاب پلتفرم" submenu: runs every platform
 # one after another (see handlers._start_all_platforms_run).
 BTN_ALL_PLATFORMS = "🚀 همه‌ی پلتفرم‌ها"
@@ -77,6 +82,7 @@ def build_main_menu_keyboard() -> ReplyKeyboardMarkup:
         [
             [BTN_SELECT_PLATFORM, BTN_CHECK_PRICES],
             [BTN_LAST_STATUS, BTN_STATUS],
+            [BTN_SEND_EXCEL],
             [BTN_STOP, BTN_CLEAR_DATABASE],
         ],
         resize_keyboard=True,

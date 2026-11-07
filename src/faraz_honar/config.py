@@ -36,6 +36,20 @@ class Settings(BaseSettings):
     )
     product_source_csv_path: Path | None = Field(default=None, alias="PRODUCT_SOURCE_CSV_PATH")
 
+    # Excel product source (replaces Google Sheets for this bot): the person
+    # sends an .xlsx file to the bot ("📤 ارسال اکسل محصولات" button -> see
+    # telegram_bot/handlers.py::document_message_handler), which saves it to
+    # excel_product_source_path, overwriting whatever was there before. Every
+    # price-related action (run, hourly recheck, check-prices, last-status)
+    # re-reads this same file fresh each time (ExcelProductSource.
+    # fetch_products), so sending a new file is the only step needed to make
+    # the bot use updated prices/products — no restart required.
+    excel_worksheet_name: str = Field(default="محصولات سایت جدید", alias="EXCEL_WORKSHEET_NAME")
+
+    @property
+    def excel_product_source_path(self) -> Path:
+        return self.data_dir / "products_upload.xlsx"
+
     @field_validator("google_service_account_file", "product_source_csv_path", mode="before")
     @classmethod
     def _blank_path_is_unset(cls, value: object) -> object:
@@ -204,68 +218,72 @@ class Settings(BaseSettings):
         default=2.0, alias="WOOCOMMERCE_WRITE_DELAY_SECONDS"
     )
 
-    # Telegram
-    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
-    telegram_allowed_user_ids: str = Field(default="", alias="TELEGRAM_ALLOWED_USER_IDS")
-    # Optional HTTP(S)/SOCKS proxy for api.telegram.org only (e.g.
-    # http://127.0.0.1:10809). Blank = direct connection (previous behavior).
-    telegram_proxy_url: str | None = Field(default=None, alias="TELEGRAM_PROXY_URL")
-    # Connectivity/crash alerts sent to ADMIN_CHAT_ID (falls back to the first
-    # TELEGRAM_ALLOWED_USER_IDS entry). Set to false to silence them.
-    telegram_alerts_enabled: bool = Field(default=True, alias="TELEGRAM_ALERTS_ENABLED")
-    # Minimum minutes between two connectivity alerts (outage storms = 1 alert).
-    telegram_alert_cooldown_minutes: int = Field(default=30, alias="TELEGRAM_ALERT_COOLDOWN_MINUTES")
-    # Timeout (seconds) for every Telegram request. The old default was 5s,
-    # far too low for a slow/unstable link.
-    telegram_request_timeout_seconds: float = Field(default=30.0, alias="TELEGRAM_REQUEST_TIMEOUT_SECONDS")
+    # Bale. Its Bot API is Telegram-Bot-API-compatible but lives on Bale's
+    # endpoint, configured below and used by bale_bot.bot.
+    bale_api_base_url: str = Field(default="https://tapi.bale.ai/bot", alias="BALE_API_BASE_URL")
+    bale_file_base_url: str = Field(default="https://tapi.bale.ai/file/bot", alias="BALE_FILE_BASE_URL")
+    # Python attribute names are retained for source compatibility with the
+    # established control panel; the public environment contract is BALE_*.
+    telegram_bot_token: str | None = Field(default=None, alias="BALE_BOT_TOKEN")
+    telegram_allowed_user_ids: str = Field(default="", alias="BALE_ALLOWED_USER_IDS")
+    # Attribute names remain compatible with the shared Telegram-based
+    # application layer, while the public environment contract stays BALE_*.
+    telegram_proxy_url: str | None = Field(default=None, alias="BALE_PROXY_URL")
+    telegram_alerts_enabled: bool = Field(default=True, alias="BALE_ALERTS_ENABLED")
+    telegram_alert_cooldown_minutes: int = Field(
+        default=30, alias="BALE_ALERT_COOLDOWN_MINUTES"
+    )
+    telegram_request_timeout_seconds: float = Field(
+        default=30.0, alias="BALE_REQUEST_TIMEOUT_SECONDS"
+    )
     # Comma-separated chat IDs that should receive the bot's reports
     # (hourly recheck report, and every manual-run message: start banner,
     # DRY_RUN banner, final report, stopped-by-user message) — see
     # telegram_bot/sending.py::broadcast_message_with_retry. Separate from
-    # TELEGRAM_ALLOWED_USER_IDS above, which is about who may send commands
+    # BALE_ALLOWED_USER_IDS above, which is about who may send commands
     # to the bot, not who receives its reports. When left blank, existing
     # behavior is preserved exactly: a manual run reports back only to the
     # chat that triggered it, and the hourly recheck reports to
-    # TELEGRAM_ALLOWED_USER_IDS, same as before this setting existed.
+    # BALE_ALLOWED_USER_IDS, same as before this setting existed.
     # NOTE: the unexpected-error message is NOT included here — it goes to
     # ADMIN_CHAT_ID only (falling back to this list when ADMIN_CHAT_ID is
     # blank), so regular team members no longer see raw error notices. See
     # telegram_bot/handlers.py::_execute_run.
-    telegram_chat_ids: str = Field(default="", alias="TELEGRAM_CHAT_IDS")
+    telegram_chat_ids: str = Field(default="", alias="BALE_CHAT_IDS")
     # Numbered per-person chat slots: TELEGRAM_CHAT_ID_1 .. TELEGRAM_CHAT_ID_10,
     # each an optional single numeric chat id, paired with the same-numbered
     # optional display name TELEGRAM_CHAT_NAME_1 .. TELEGRAM_CHAT_NAME_10 (e.g. a
     # Persian name shown in "who did what" notices). Purely additive — the
-    # comma-separated TELEGRAM_ALLOWED_USER_IDS / TELEGRAM_CHAT_IDS above are
+    # comma-separated BALE_ALLOWED_USER_IDS / BALE_CHAT_IDS above are
     # unchanged. See numbered_chat_ids_set and display_name() below.
     # Chat id of the one person who should also get every manual run's
-    # final report even if not already in TELEGRAM_CHAT_IDS /
+    # final report even if not already in BALE_CHAT_IDS /
     # TELEGRAM_CHAT_ID_1..10 — they see the exact same report text as
     # everyone else (no separate admin-only detail; see
     # telegram_bot/reporting.py::format_final_digikala_report). Left blank,
     # no extra recipient is added and behavior is unchanged. See
     # telegram_bot/handlers.py::_send_final_report.
-    admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
-    telegram_chat_id_1: str = Field(default="", alias="TELEGRAM_CHAT_ID_1")
-    telegram_chat_id_2: str = Field(default="", alias="TELEGRAM_CHAT_ID_2")
-    telegram_chat_id_3: str = Field(default="", alias="TELEGRAM_CHAT_ID_3")
-    telegram_chat_id_4: str = Field(default="", alias="TELEGRAM_CHAT_ID_4")
-    telegram_chat_id_5: str = Field(default="", alias="TELEGRAM_CHAT_ID_5")
-    telegram_chat_id_6: str = Field(default="", alias="TELEGRAM_CHAT_ID_6")
-    telegram_chat_id_7: str = Field(default="", alias="TELEGRAM_CHAT_ID_7")
-    telegram_chat_id_8: str = Field(default="", alias="TELEGRAM_CHAT_ID_8")
-    telegram_chat_id_9: str = Field(default="", alias="TELEGRAM_CHAT_ID_9")
-    telegram_chat_id_10: str = Field(default="", alias="TELEGRAM_CHAT_ID_10")
-    telegram_chat_name_1: str = Field(default="", alias="TELEGRAM_CHAT_NAME_1")
-    telegram_chat_name_2: str = Field(default="", alias="TELEGRAM_CHAT_NAME_2")
-    telegram_chat_name_3: str = Field(default="", alias="TELEGRAM_CHAT_NAME_3")
-    telegram_chat_name_4: str = Field(default="", alias="TELEGRAM_CHAT_NAME_4")
-    telegram_chat_name_5: str = Field(default="", alias="TELEGRAM_CHAT_NAME_5")
-    telegram_chat_name_6: str = Field(default="", alias="TELEGRAM_CHAT_NAME_6")
-    telegram_chat_name_7: str = Field(default="", alias="TELEGRAM_CHAT_NAME_7")
-    telegram_chat_name_8: str = Field(default="", alias="TELEGRAM_CHAT_NAME_8")
-    telegram_chat_name_9: str = Field(default="", alias="TELEGRAM_CHAT_NAME_9")
-    telegram_chat_name_10: str = Field(default="", alias="TELEGRAM_CHAT_NAME_10")
+    admin_chat_id: int | None = Field(default=None, alias="BALE_ADMIN_CHAT_ID")
+    telegram_chat_id_1: str = Field(default="", alias="BALE_CHAT_ID_1")
+    telegram_chat_id_2: str = Field(default="", alias="BALE_CHAT_ID_2")
+    telegram_chat_id_3: str = Field(default="", alias="BALE_CHAT_ID_3")
+    telegram_chat_id_4: str = Field(default="", alias="BALE_CHAT_ID_4")
+    telegram_chat_id_5: str = Field(default="", alias="BALE_CHAT_ID_5")
+    telegram_chat_id_6: str = Field(default="", alias="BALE_CHAT_ID_6")
+    telegram_chat_id_7: str = Field(default="", alias="BALE_CHAT_ID_7")
+    telegram_chat_id_8: str = Field(default="", alias="BALE_CHAT_ID_8")
+    telegram_chat_id_9: str = Field(default="", alias="BALE_CHAT_ID_9")
+    telegram_chat_id_10: str = Field(default="", alias="BALE_CHAT_ID_10")
+    telegram_chat_name_1: str = Field(default="", alias="BALE_CHAT_NAME_1")
+    telegram_chat_name_2: str = Field(default="", alias="BALE_CHAT_NAME_2")
+    telegram_chat_name_3: str = Field(default="", alias="BALE_CHAT_NAME_3")
+    telegram_chat_name_4: str = Field(default="", alias="BALE_CHAT_NAME_4")
+    telegram_chat_name_5: str = Field(default="", alias="BALE_CHAT_NAME_5")
+    telegram_chat_name_6: str = Field(default="", alias="BALE_CHAT_NAME_6")
+    telegram_chat_name_7: str = Field(default="", alias="BALE_CHAT_NAME_7")
+    telegram_chat_name_8: str = Field(default="", alias="BALE_CHAT_NAME_8")
+    telegram_chat_name_9: str = Field(default="", alias="BALE_CHAT_NAME_9")
+    telegram_chat_name_10: str = Field(default="", alias="BALE_CHAT_NAME_10")
 
     # Business rules
     max_price_increase_pct: float = Field(default=0.12, alias="MAX_PRICE_INCREASE_PCT")
