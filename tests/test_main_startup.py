@@ -97,3 +97,18 @@ def test_service_wires_configured_digikala_delays_into_client():
     digikala = service._platform_registry["digikala"]  # noqa: SLF001 - white-box sanity check
     assert digikala._read_delay_seconds == 3.0  # noqa: SLF001
     assert digikala._write_delay_seconds == 6.0  # noqa: SLF001
+
+
+def test_bot_applies_raised_timeouts_error_handler_and_proxy():
+    settings = _settings(
+        product_source_csv_path=FIXTURES / "sample_product_sheet.csv",
+        telegram_bot_token="123456:placeholder-token-not-real",
+        telegram_allowed_user_ids="1",
+        telegram_request_timeout_seconds=30,
+        telegram_proxy_url="http://127.0.0.1:10809",
+    )
+    application = build_application(settings, build_service(settings))
+    assert application.error_handlers, "global error handler must be registered"
+    request = application.bot._request[1]  # noqa: SLF001 - white-box: the normal-API request
+    assert request._client.timeout.connect == 30  # noqa: SLF001
+    assert application.bot._request[0]._client.timeout.read == 40  # noqa: SLF001 - getUpdates: 30+10

@@ -100,7 +100,15 @@ def main() -> int:
     schedule_hourly_recheck(application, settings)
 
     logger.info("Bot ready. Available platforms: %s", ", ".join(service.available_platforms) or "(none)")
-    application.run_polling()
+    # bootstrap_retries=-1: if the network is down while the service starts
+    # (e.g. DNS not ready after a reboot) keep retrying instead of crashing.
+    # Network errors while polling are already retried by python-telegram-bot
+    # itself and reported through the error handler (telegram_bot/alerts.py).
+    # python-telegram-bot logs every failed bootstrap attempt at DEBUG, which the
+    # INFO-level root logger drops - a failing startup would otherwise retry
+    # silently forever. Make those lines (class name only, no URL/token) visible.
+    logging.getLogger("telegram.ext._utils.networkloop").setLevel(logging.DEBUG)
+    application.run_polling(bootstrap_retries=-1)
     return 0
 
 

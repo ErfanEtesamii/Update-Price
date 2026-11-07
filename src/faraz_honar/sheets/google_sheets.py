@@ -8,7 +8,11 @@ ConfigurationError rather than failing deep inside a network call.
 from __future__ import annotations
 
 import logging
+import ssl
 from pathlib import Path
+
+import requests
+from requests.adapters import HTTPAdapter
 
 from faraz_honar.core.exceptions import ConfigurationError
 from faraz_honar.core.models import Product
@@ -21,6 +25,51 @@ _SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
     "https://www.googleapis.com/auth/drive.readonly",
 ]
+
+
+class _Tls12Adapter(HTTPAdapter):
+    """Pins TLS 1.2 for connections to Google.
+
+    On this network the larger TLS 1.3 ClientHello that Python/OpenSSL sends is
+    cut mid-handshake (``SSLEOFError: UNEXPECTED_EOF_WHILE_READING``) while
+    TLS 1.2 passes, so Google API sessions are restricted to TLS 1.2.
+    """
+
+    def _tls12_context(self) -> ssl.SSLContext:
+        ctx = ssl.create_default_context()
+        ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+        return ctx
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._tls12_context()
+        return super().init_poolmanager(*args, **kwargs)
+
+    def build_connection_pool_key_attributes(self, request, verify, cert=None):
+        host_params, pool_kwargs = super().build_connection_pool_key_attributes(
+            request, verify, cert
+        )
+        # requests >= 2.32 injects its own default SSLContext when verify=True,
+        # which would override the TLS 1.2 pin. Force ours.
+        if "ssl_context" in pool_kwargs:
+            ctx = self._tls12_context()
+            try:
+                import certifi
+
+                ctx.load_verify_locations(certifi.where())
+            except Exception:  # noqa: BLE001 - fall back to the system store
+                pass
+            pool_kwargs["ssl_context"] = ctx
+        return host_params, pool_kwargs
+
+    def proxy_manager_for(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._tls12_context()
+        return super().proxy_manager_for(*args, **kwargs)
+
+
+def _tls12_session() -> requests.Session:
+    session = requests.Session()
+    session.mount("https://", _Tls12Adapter())
+    return session
 
 
 class GoogleSheetsProductSource(ProductSource):
@@ -60,8 +109,14 @@ class GoogleSheetsProductSource(ProductSource):
         import gspread
         from google.oauth2.service_account import Credentials
 
+        from google.auth.transport.requests import AuthorizedSession, Request
+
         creds = Credentials.from_service_account_file(str(self._service_account_file), scopes=_SCOPES)
-        client = gspread.authorize(creds)
+        # Both the API session and the token-refresh session go through the
+        # TLS 1.2 adapter (these sessions only ever talk to Google).
+        session = AuthorizedSession(creds, auth_request=Request(session=_tls12_session()))
+        session.mount("https://", _Tls12Adapter())
+        client = gspread.authorize(creds, session=session)
         return client.open_by_key(self._sheet_id)
 
     def _open_worksheet(self):

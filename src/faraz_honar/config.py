@@ -207,6 +207,17 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     telegram_allowed_user_ids: str = Field(default="", alias="TELEGRAM_ALLOWED_USER_IDS")
+    # Optional HTTP(S)/SOCKS proxy for api.telegram.org only (e.g.
+    # http://127.0.0.1:10809). Blank = direct connection (previous behavior).
+    telegram_proxy_url: str | None = Field(default=None, alias="TELEGRAM_PROXY_URL")
+    # Connectivity/crash alerts sent to ADMIN_CHAT_ID (falls back to the first
+    # TELEGRAM_ALLOWED_USER_IDS entry). Set to false to silence them.
+    telegram_alerts_enabled: bool = Field(default=True, alias="TELEGRAM_ALERTS_ENABLED")
+    # Minimum minutes between two connectivity alerts (outage storms = 1 alert).
+    telegram_alert_cooldown_minutes: int = Field(default=30, alias="TELEGRAM_ALERT_COOLDOWN_MINUTES")
+    # Timeout (seconds) for every Telegram request. The old default was 5s,
+    # far too low for a slow/unstable link.
+    telegram_request_timeout_seconds: float = Field(default=30.0, alias="TELEGRAM_REQUEST_TIMEOUT_SECONDS")
     # Comma-separated chat IDs that should receive the bot's reports
     # (hourly recheck report, and every manual-run message: start banner,
     # DRY_RUN banner, final report, stopped-by-user message) — see
